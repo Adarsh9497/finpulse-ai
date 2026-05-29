@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FinPulse AI | Financial Intelligence</title>
+    <meta name="description" content="Enterprise-grade Agentic Financial Intelligence System for Retrieval-Augmented Generation (RAG) over dense financial documents.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Background Elements -->
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header glass-panel">
+            <div class="logo">
+                <div class="logo-icon"></div>
+                <h1>FinPulse AI</h1>
+            </div>
+            <div class="status-indicator">
+                <span class="status-dot"></span> System Online
+            </div>
+        </header>
+
+        <main class="main-content">
+            <!-- Left Panel: Ingestion -->
+            <section class="ingestion-panel glass-panel" aria-labelledby="ingestion-heading">
+                <h2 id="ingestion-heading" class="panel-title">Document Ingestion</h2>
+                <p class="panel-desc">Vectorize and store financial documents into PGVector.</p>
+                
+                <form id="ingest-form" class="ingest-form">
+                    <div class="form-group">
+                        <label for="file-upload">Upload Document (PDF, CSV, TXT, DOCX)</label>
+                        <input type="file" id="file-upload" name="file" accept=".pdf,.txt,.csv,.docx" required>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group half">
+                            <label for="chunk-type">Data Type</label>
+                            <select id="chunk-type" name="chunkType">
+                                <option value="TEXT">Narrative Text</option>
+                                <option value="TABLE">Financial Table</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary" id="ingest-btn">
+                        <span class="btn-text">Upload & Queue Processing</span>
+                        <div class="loader hidden"></div>
+                    </button>
+
+                    <div id="ingest-result" class="result-message hidden"></div>
+                </form>
+            </section>
+
+            <!-- Right Panel: Chat Interface -->
+            <section class="chat-panel glass-panel" aria-labelledby="chat-heading">
+                <div class="chat-header">
+                    <h2 id="chat-heading" class="panel-title">Financial Assistant</h2>
+                    <p class="panel-desc">Ask questions based strictly on ingested context.</p>
+                </div>
+                
+                <div class="chat-history" id="chat-history">
+                    <div class="message system-message">
+                        <div class="message-avatar">AI</div>
+                        <div class="message-content">
+                            <p>Hello. I am FinPulse AI, your financial analyst assistant. I am ready to answer questions based on the ingested documents. How can I help you today?</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <form id="chat-form" class="chat-input-area">
+                    <textarea id="chat-input" placeholder="Ask about revenue, margins, or insights..." rows="1" required></textarea>
+                    <button type="submit" class="btn btn-icon" id="chat-btn" aria-label="Send message">
+                        <svg xmlns="http://www.w3.org/2001/svg" viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+                            <path d="M3.478 2.404a.75.75 0 0 0-.926.941l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.404Z" />
+                        </svg>
+                    </button>
+                </form>
+            </section>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

@@ -1,24 +1,25 @@
-# 📊 FinPulse AI — Agentic Financial Intelligence System
+# 📊 FinPulse AI — Enterprise Financial Intelligence System
 
 [![Java Version](https://img.shields.io/badge/Java-21-orange.svg?style=for-the-badge&logo=openjdk)](https://adoptium.net/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.4.1-brightgreen.svg?style=for-the-badge&logo=springboot)](https://spring.io/projects/spring-boot)
 [![Spring AI](https://img.shields.io/badge/Spring%20AI-1.0.0-blue.svg?style=for-the-badge&logo=spring)](https://spring.io/projects/spring-ai)
+[![RabbitMQ](https://img.shields.io/badge/Message_Broker-RabbitMQ-ff6600.svg?style=for-the-badge&logo=rabbitmq)](https://www.rabbitmq.com/)
 [![PostgreSQL](https://img.shields.io/badge/Vector%20Store-PGVector%2016-blue?style=for-the-badge&logo=postgresql)](https://github.com/pgvector/pgvector)
 [![OpenAI](https://img.shields.io/badge/LLM-GPT--4o--mini-blueviolet?style=for-the-badge&logo=openai)](https://openai.com/)
 
-**FinPulse AI** is an enterprise-grade, agentic financial intelligence engine built on Spring Boot and Spring AI. It enables high-fidelity financial document ingestion, structured chunking, vector embeddings generation, and strict, trace-grounded Retrieval-Augmented Generation (RAG) query resolution. 
+**FinPulse AI** is an enterprise-grade, agentic financial intelligence engine built on Spring Boot and Spring AI. It enables high-fidelity multi-format document ingestion (PDFs, CSVs, etc.), asynchronous background processing, structured chunking, vector embeddings generation, and strict, trace-grounded Retrieval-Augmented Generation (RAG) query resolution. 
 
-It is designed specifically for financial analysts and operations teams who require zero-hallucination responses extracted from complex reports (10-K filings, earnings calls, quarterly statements) with explicit page and source file citations.
+It is designed specifically for financial analysts and operations teams who require zero-hallucination responses extracted from complex reports (10-K filings, earnings calls, quarterly statements) with explicit source file citations.
 
 ---
 
 ## ✨ Key Features
 
-*   **⚡ Automated Vector Ingestion**: Splits long, unstructured financial narratives and tables into optimized semantic chunks (500 tokens, 50 token overlap) utilizing `TokenTextSplitter`.
+*   **⚡ Asynchronous Multi-Format Ingestion**: Supports direct uploads of PDFs, Word Docs, and CSVs. Uses **Apache Tika** for parsing and **RabbitMQ** for processing heavy documents in the background without blocking the UI.
 *   **🧠 Semantics-Driven Retrieval**: Uses OpenAI's high-performance `text-embedding-3-small` (1536-dimensions) to generate embedding vectors stored directly in PostgreSQL using `pgvector`.
+*   **🎨 Premium Glassmorphism UI**: Features a beautiful, responsive, dark-mode single-page application built with Vanilla HTML/JS/CSS served right from the Spring Boot static resources.
 *   **🔒 Strict Zero-Hallucination Guardrails**: Includes precise system prompts and a similarity threshold cut-off (`0.5`) to guarantee that responses are built strictly from matching financial context or fall back gracefully.
-*   **🏷️ Citation-Backed Answers**: All responses cite the specific source document and page numbers from which the financial data was extracted.
-*   **🐳 Immediate Local Provisioning**: Built-in support for **Spring Boot Docker Compose**, instantly starting up a PostgreSQL database with the `pgvector` extension upon booting the application.
+*   **🐳 Immediate Local Provisioning**: Built-in support for **Spring Boot Docker Compose**, instantly starting up a PostgreSQL database (with `pgvector`) and RabbitMQ upon booting the application.
 
 ---
 
@@ -29,48 +30,31 @@ It is designed specifically for financial analysts and operations teams who requ
 | **Runtime** | Java OpenJDK | 21 | High-performance, modern JVM features |
 | **Framework** | Spring Boot | 3.4.1 | Reactive and enterprise core dependency injection |
 | **AI Layer** | Spring AI (BOM) | 1.0.0 | High-level abstraction for vector store and chat clients |
+| **Document Parser**| Apache Tika | 1.0.0 | Native parsing of complex file formats (PDF/CSV/DOCX) |
+| **Message Broker** | RabbitMQ | 3.x | Decoupled, asynchronous background ingestion tasks |
 | **LLM Gateway** | OpenAI | `gpt-4o-mini` | Cost-effective and fast reasoning / text synthesis |
 | **Embeddings** | OpenAI Embeddings | `text-embedding-3-small` | Semantic search vectors (1536 dims) |
 | **Vector Store** | PostgreSQL + pgvector | 16 | Relational persistence & multi-dimensional search |
-| **Infrastructure** | Docker Compose | pg16-vector | Containerized PostgreSQL automation |
-| **Testing** | JUnit 5 + Testcontainers | 3.4.1 | Reproducible database container integration tests |
+| **UI Frontend** | Vanilla HTML/CSS/JS | - | Glassmorphism SPA served via Spring Web |
 
 ---
 
 ## 📐 Architecture & Data Flow
 
-The project is structured around clean Spring Boot architectural layers:
+### Ingestion Flow (Asynchronous)
+1. A user uploads a multi-part file (e.g., PDF) via the UI to `/api/v1/ingest`.
+2. The `ChatController` saves the file temporarily and drops a `FileIngestionMessage` onto the **RabbitMQ Exchange**, instantly returning a `202 Accepted` to the UI.
+3. The `IngestionService` (`@RabbitListener`) picks up the job in the background.
+4. **Apache Tika** extracts text from the document natively.
+5. `TokenTextSplitter` segments the text into ~500 token windows with a 50-token overlap.
+6. Chunks are sent to the OpenAI embedding endpoint, transformed into vectors, and saved within a `vector_store` table in PostgreSQL.
+7. The temporary file is cleaned up.
 
-```text
-finpulse-ai/
-├── compose.yml                         # Runs pgvector-enabled PostgreSQL 16
-├── pom.xml                             # Core project configuration & dependency BOMs
-└── src/
-    └── main/
-        ├── java/com/finpulse/finpulse_ai/
-        │   ├── FinpulseAiApplication.java    # Application Bootstrapper
-        │   ├── controller/
-        │   │   └── ChatController.java       # Exposes the /api/v1/chat and /api/v1/ingest endpoints
-        │   ├── dto/                          # Immutable API Request/Response records
-        │   └── service/
-        │       ├── IngestionService.java     # Text splitting, embedding generation, and DB storage
-        │       ├── SemanticSearchService.java # Threshold-filtered cosine-similarity vector queries
-        │       └── ChatService.java          # Context formatting, system prompts, and RAG execution
-        └── resources/
-            └── application.properties        # Application configurations (models, ports, database credentials)
-```
-
-### Ingestion Flow
-1. Text is sent to `/api/v1/ingest` along with metadata (`sourceFile`, `pageNumber`, `chunkType`).
-2. `IngestionService` converts the payload into Spring AI `Document` models.
-3. `TokenTextSplitter` segments the text into ~500 token windows with a 50-token overlap to maintain contextual continuity.
-4. Chunks are sent to the OpenAI embedding endpoint, transformed into vectors, and saved within a `vector_store` table in PostgreSQL.
-
-### Query / RAG Flow
-1. Questions are sent to `/api/v1/chat`.
+### Query / RAG Flow (Synchronous)
+1. User submits a question via the Chat UI to `/api/v1/chat`.
 2. `SemanticSearchService` performs a cosine similarity lookup against PostgreSQL (`COSINE_DISTANCE` metric, threshold `0.5`).
 3. Matching text chunks are formatted as citation blocks (`[Page X | filename]`).
-4. A strict system prompt forces the LLM (`gpt-4o-mini`) to answer *only* based on the context. If no context matches, the system returns a safe, pre-configured response: *"I could not find this information in the uploaded documents."*
+4. A strict system prompt forces the LLM (`gpt-4o-mini`) to answer *only* based on the context. 
 
 ---
 
@@ -78,7 +62,7 @@ finpulse-ai/
 
 ### Prerequisites
 *   **Java**: JDK 21+ installed and configured.
-*   **Docker Desktop**: Ensure Docker is running locally (required to spin up the PostgreSQL vector database).
+*   **Docker Desktop**: Ensure Docker is running locally (required to spin up the PostgreSQL vector database and RabbitMQ).
 *   **OpenAI API Key**: A valid key to generate embeddings and execute chat completions.
 
 ### Configuration
@@ -96,60 +80,40 @@ finpulse-ai/
    ```
 
 ### Running Locally
-Run the Maven spring-boot plugin directly from the project directory. The Spring Docker Compose integration will automatically detect and start your local PostgreSQL vector container:
+Run the Maven spring-boot plugin directly from the project directory. The Spring Docker Compose integration will automatically detect and start your local PostgreSQL and RabbitMQ containers!
 
 ```bash
 ./mvnw spring-boot:run
 ```
 
-Once booted, the application will be listening on: **`http://localhost:8201`**
+Once booted, open your browser and navigate to the premium frontend UI: **`http://localhost:8201`**
 
 ---
 
 ## 🔌 API Reference
 
-### 1. Ingest Document Content
-Ingests raw text or financial tables from a specific source file and page index.
+### 1. Ingest Document Content (Async)
+Uploads a document for asynchronous parsing and embedding.
 
 *   **Endpoint**: `POST /api/v1/ingest`
-*   **Headers**: `Content-Type: application/json`
-*   **Payload Example**:
-    ```json
-    {
-      "text": "For the fiscal year ended December 31, 2025, FinPulse Inc. reports total operating revenue of $148.5 million, up 12% year-over-year. Operating income stood at $34.2 million, showing strong margin expansion due to platform automation.",
-      "sourceFile": "finpulse_annual_report_2025.pdf",
-      "pageNumber": 14,
-      "chunkType": "TEXT"
-    }
-    ```
-
-*   **cURL Command**:
-    ```bash
-    curl -X POST http://localhost:8201/api/v1/ingest \
-      -H "Content-Type: application/json" \
-      -d '{
-        "text": "For the fiscal year ended December 31, 2025, FinPulse Inc. reports total operating revenue of $148.5 million, up 12% year-over-year. Operating income stood at $34.2 million, showing strong margin expansion due to platform automation.",
-        "sourceFile": "finpulse_annual_report_2025.pdf",
-        "pageNumber": 14,
-        "chunkType": "TEXT"
-      }'
-    ```
+*   **Content-Type**: `multipart/form-data`
+*   **Form Data**:
+    * `file`: (File) The PDF, CSV, or DOCX file to upload.
+    * `chunkType`: (String) "TEXT" or "TABLE"
 
 *   **Response**:
     ```json
     {
-      "chunksStored": 1,
+      "message": "File queued for async processing.",
       "sourceFile": "finpulse_annual_report_2025.pdf"
     }
     ```
 
----
-
 ### 2. Grounded Chat Query
-Asks a financial query. The server performs semantic search, builds the grounded context, and executes the RAG pipeline.
+Asks a financial query. The server performs semantic search and executes the RAG pipeline.
 
 *   **Endpoint**: `POST /api/v1/chat`
-*   **Headers**: `Content-Type: application/json`
+*   **Content-Type**: `application/json`
 *   **Payload Example**:
     ```json
     {
@@ -157,19 +121,10 @@ Asks a financial query. The server performs semantic search, builds the grounded
     }
     ```
 
-*   **cURL Command**:
-    ```bash
-    curl -X POST http://localhost:8201/api/v1/chat \
-      -H "Content-Type: application/json" \
-      -d '{
-        "message": "What was the operating revenue for FinPulse Inc in fiscal year 2025 and did margins expand?"
-      }'
-    ```
-
 *   **Response**:
     ```json
     {
-      "answer": "According to the financial reports, FinPulse Inc. reported a total operating revenue of $148.5 million for the fiscal year ended December 31, 2025. This represents a 12% increase year-over-year. Additionally, there was strong margin expansion due to platform automation, with operating income reaching $34.2 million. [Page 14 | finpulse_annual_report_2025.pdf]"
+      "answer": "According to the financial reports, FinPulse Inc. reported a total operating revenue of $148.5 million for the fiscal year ended December 31, 2025... [Page N/A | finpulse_annual_report_2025.pdf]"
     }
     ```
 
@@ -189,5 +144,5 @@ To run the full suite of unit and integration tests:
 
 ## 🗺️ Roadmap & Conventions
 
-For a deep dive into the service design principles, full sequence diagrams, strict conventions (e.g., records for immutability, similarity guardrails), and upcoming multi-agent orchestrator integrations, please refer to the onboarding blueprints in:
+For a deep dive into the service design principles, full sequence diagrams, strict conventions, and upcoming orchestrator integrations, please refer to the onboarding blueprints in:
 👉 **[agent.md](./agent.md)**
